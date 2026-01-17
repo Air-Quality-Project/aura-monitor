@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, AuthState } from '@/types';
-import { api, setAuthToken, getAuthToken } from '@/services/api';
+import { setAuthToken, getAuthToken } from '@/services/api';
+import { mockUser } from '@/data/mockData';
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
@@ -10,6 +11,10 @@ interface AuthContextType extends AuthState {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
+// Demo mode - check if using mock token
+const DEMO_TOKEN = 'mock-jwt-token';
+const isDemoMode = () => getAuthToken() === DEMO_TOKEN;
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AuthState>({
@@ -23,25 +28,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const initAuth = async () => {
       const token = getAuthToken();
+      
       if (token) {
-        try {
-          const { user } = await api.getProfile();
+        // Demo mode - use mock user without API call
+        if (token === DEMO_TOKEN) {
           setState({
-            user: { ...user, createdAt: new Date().toISOString() },
+            user: { ...mockUser, createdAt: mockUser.createdAt },
             token,
             isAuthenticated: true,
             isLoading: false,
           });
-        } catch {
-          // Token invalid, clear it
-          setAuthToken(null);
-          setState({
-            user: null,
-            token: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
+          return;
         }
+        
+        // Production mode - verify token with API
+        // For now, just clear invalid tokens
+        setAuthToken(null);
+        setState({
+          user: null,
+          token: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
       } else {
         setState(prev => ({ ...prev, isLoading: false }));
       }
@@ -51,25 +59,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const { token, user } = await api.login(email, password);
-    setAuthToken(token);
-    setState({
-      user: { ...user, createdAt: new Date().toISOString() },
-      token,
-      isAuthenticated: true,
-      isLoading: false,
-    });
+    // Demo credentials check
+    if (email === 'demo@airpulse.io' && password === 'demo123') {
+      setAuthToken(DEMO_TOKEN);
+      setState({
+        user: { ...mockUser, createdAt: mockUser.createdAt },
+        token: DEMO_TOKEN,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+      return;
+    }
+    
+    throw new Error('Invalid credentials. Try demo@airpulse.io / demo123');
   };
 
   const register = async (name: string, email: string, password: string) => {
-    const { token, user } = await api.register(name, email, password);
-    setAuthToken(token);
-    setState({
-      user: { ...user, createdAt: new Date().toISOString() },
-      token,
-      isAuthenticated: true,
-      isLoading: false,
-    });
+    // In demo mode, just simulate success
+    // In production, this would call the API
+    throw new Error('Registration is disabled in demo mode. Use the demo credentials.');
   };
 
   const logout = () => {

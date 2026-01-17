@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthLayout } from '@/components/layout';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ const loginSchema = z.object({
 
 const Login = () => {
   const { login } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -35,17 +36,8 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      // For demo, simulate API delay and use mock auth
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock successful login (in production, use: await login(email, password))
-      if (email === 'demo@airpulse.io' && password === 'demo123') {
-        // Simulate setting auth state
-        localStorage.setItem('auth_token', 'mock-jwt-token');
-        window.location.href = '/';
-      } else {
-        throw new Error('Invalid credentials. Try demo@airpulse.io / demo123');
-      }
+      await login(email, password);
+      navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
     } finally {
