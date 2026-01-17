@@ -1,0 +1,151 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { AuthLayout } from '@/components/layout';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, AlertCircle } from 'lucide-react';
+import { z } from 'zod';
+
+const loginSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+
+const Login = () => {
+  const { login } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    // Validate input
+    const result = loginSchema.safeParse({ email, password });
+    if (!result.success) {
+      setError(result.error.errors[0].message);
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // For demo, simulate API delay and use mock auth
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Mock successful login (in production, use: await login(email, password))
+      if (email === 'demo@airpulse.io' && password === 'demo123') {
+        // Simulate setting auth state
+        localStorage.setItem('auth_token', 'mock-jwt-token');
+        window.location.href = '/';
+      } else {
+        throw new Error('Invalid credentials. Try demo@airpulse.io / demo123');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <AuthLayout>
+      <div className="space-y-6">
+        <div className="space-y-2 text-center lg:text-left">
+          <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
+          <p className="text-sm text-muted-foreground">
+            Enter your credentials to access your dashboard
+          </p>
+        </div>
+
+        {error && (
+          <Alert variant="destructive" className="animate-fade-in">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              disabled={isLoading}
+              className="h-11"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <Link
+                to="/forgot-password"
+                className="text-xs text-primary hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </div>
+            <Input
+              id="password"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              disabled={isLoading}
+              className="h-11"
+            />
+          </div>
+
+          <Button type="submit" className="h-11 w-full" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              'Sign in'
+            )}
+          </Button>
+        </form>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">
+              Demo credentials
+            </span>
+          </div>
+        </div>
+
+        <div className="rounded-lg border bg-muted/30 p-3 text-center text-sm">
+          <p className="text-muted-foreground">
+            Email: <code className="text-foreground">demo@airpulse.io</code>
+          </p>
+          <p className="text-muted-foreground">
+            Password: <code className="text-foreground">demo123</code>
+          </p>
+        </div>
+
+        <p className="text-center text-sm text-muted-foreground">
+          Don't have an account?{' '}
+          <Link to="/register" className="font-medium text-primary hover:underline">
+            Sign up
+          </Link>
+        </p>
+      </div>
+    </AuthLayout>
+  );
+};
+
+export default Login;
