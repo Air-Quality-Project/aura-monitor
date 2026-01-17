@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, AuthState } from '@/types';
-import { setAuthToken, getAuthToken } from '@/services/api';
-import { mockUser } from '@/data/mockData';
+import { api, setAuthToken, getAuthToken } from '@/services/api';
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
@@ -12,10 +11,6 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Demo mode - check if using mock token
-const DEMO_TOKEN = 'mock-jwt-token';
-const isDemoMode = () => getAuthToken() === DEMO_TOKEN;
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -24,60 +19,67 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isLoading: true,
   });
 
-  // Check for existing token on mount
-  useEffect(() => {
-    const initAuth = async () => {
-      const token = getAuthToken();
-      
-      if (token) {
-        // Demo mode - use mock user without API call
-        if (token === DEMO_TOKEN) {
-          setState({
-            user: { ...mockUser, createdAt: mockUser.createdAt },
-            token,
-            isAuthenticated: true,
-            isLoading: false,
-          });
-          return;
-        }
-        
-        // Production mode - verify token with API
-        // For now, just clear invalid tokens
-        setAuthToken(null);
-        setState({
-          user: null,
-          token: null,
-          isAuthenticated: false,
-          isLoading: false,
-        });
-      } else {
-        setState(prev => ({ ...prev, isLoading: false }));
-      }
-    };
+  // 🔄 Restore session on refresh
+ useEffect(() => {
+  const restoreSession = async () => {
+    const token = getAuthToken();
 
-    initAuth();
-  }, []);
+    if (!token) {
+      setState(prev => ({ ...prev, isLoading: false }));
+      return;
+    }
 
-  const login = async (email: string, password: string) => {
-    // Demo credentials check
-    if (email === 'demo@airpulse.io' && password === 'demo123') {
-      setAuthToken(DEMO_TOKEN);
+    try {
+      const res = await api.getProfile();
+
       setState({
-        user: { ...mockUser, createdAt: mockUser.createdAt },
-        token: DEMO_TOKEN,
+        user: res.user,
+        token,
         isAuthenticated: true,
         isLoading: false,
       });
-      return;
+    } catch {
+      // token invalid
+      setAuthToken(null);
+      setState({
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        isLoading: false,
+      });
     }
-    
-    throw new Error('Invalid credentials. Try demo@airpulse.io / demo123');
   };
 
+  restoreSession();
+}, []);
+
+
+  // ✅ LOGIN → BACKEND
+  const login = async (email: string, password: string) => {
+    const res = await api.login(email, password);
+
+    setAuthToken(res.token);
+
+    setState({
+      user: res.user,
+      token: res.token,
+      isAuthenticated: true,
+      isLoading: false,
+    });
+  };
+
+  // ✅ REGISTER → BACKEND
   const register = async (name: string, email: string, password: string) => {
-    // In demo mode, just simulate success
-    // In production, this would call the API
-    throw new Error('Registration is disabled in demo mode. Use the demo credentials.');
+    const res = await api.register(name, email, password);
+
+    setAuthToken(res.token);
+
+    setState({
+      user: res.user,
+      token: res.token,
+      isAuthenticated: true,
+      isLoading: false,
+    });
   };
 
   const logout = () => {

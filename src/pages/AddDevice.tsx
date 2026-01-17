@@ -7,15 +7,18 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle, CheckCircle2, Cpu, QrCode } from 'lucide-react';
 import { z } from 'zod';
+import { api } from '@/services/api'; // ✅ REAL API
 
 const pairingSchema = z.object({
-  pairingCode: z.string()
+  pairingCode: z
+    .string()
     .length(6, 'Pairing code must be 6 characters')
     .regex(/^[A-Z0-9]+$/, 'Pairing code must contain only letters and numbers'),
 });
 
 const AddDevice = () => {
   const navigate = useNavigate();
+
   const [pairingCode, setPairingCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -27,6 +30,7 @@ const AddDevice = () => {
 
     const upperCode = pairingCode.toUpperCase();
     const result = pairingSchema.safeParse({ pairingCode: upperCode });
+
     if (!result.success) {
       setError(result.error.errors[0].message);
       return;
@@ -35,19 +39,21 @@ const AddDevice = () => {
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Mock success (in production, call API)
+      // ✅ REAL BACKEND CALL
+      await api.claimDevice(upperCode);
+
       setSuccess(true);
       setTimeout(() => navigate('/devices'), 2000);
-    } catch (err) {
-      setError('Failed to pair device. Please check the code and try again.');
+    } catch (err: any) {
+      setError(
+        err?.message || 'Failed to pair device. Please check the code and try again.'
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
+  /* ================= SUCCESS STATE ================= */
   if (success) {
     return (
       <AppLayout>
@@ -67,6 +73,7 @@ const AddDevice = () => {
     );
   }
 
+  /* ================= MAIN FORM ================= */
   return (
     <AppLayout>
       <div className="mx-auto max-w-lg animate-fade-in">
@@ -86,25 +93,25 @@ const AddDevice = () => {
           <h3 className="font-medium">How to get your pairing code:</h3>
           <ol className="mt-3 space-y-2 text-sm text-muted-foreground">
             <li className="flex gap-3">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
                 1
               </span>
               Power on your ESP32 device
             </li>
             <li className="flex gap-3">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
                 2
               </span>
               Connect it to WiFi using the setup process
             </li>
             <li className="flex gap-3">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
                 3
               </span>
               A 6-digit code will appear on the device display
             </li>
             <li className="flex gap-3">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
                 4
               </span>
               Enter that code below to complete pairing
@@ -129,9 +136,11 @@ const AddDevice = () => {
                 <Input
                   id="pairingCode"
                   value={pairingCode}
-                  onChange={e => setPairingCode(e.target.value.toUpperCase().slice(0, 6))}
+                  onChange={(e) =>
+                    setPairingCode(e.target.value.toUpperCase().slice(0, 6))
+                  }
                   placeholder="ABC123"
-                  className="h-14 pl-11 text-center text-2xl font-mono tracking-[0.5em] uppercase"
+                  className="h-14 pl-11 text-center text-2xl font-mono tracking-[0.5em]"
                   disabled={isLoading}
                   maxLength={6}
                 />

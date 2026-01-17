@@ -1,5 +1,5 @@
 // API base configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
 // Token management
 let authToken: string | null = localStorage.getItem('auth_token');

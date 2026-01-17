@@ -1,13 +1,12 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AppLayout } from '@/components/layout';
-import { useAuth } from '@/hooks/useAuth';
-import { mockUser } from '@/data/mockData';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { AppLayout } from "@/components/layout";
+import { useAuth } from "@/hooks/useAuth";
+import { api } from "@/services/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   User,
   Mail,
@@ -17,35 +16,79 @@ import {
   CheckCircle2,
   Shield,
   Bell,
-} from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
+} from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
+/* =======================
+   Types
+   ======================= */
+type NotificationSettings = {
+  emailAlerts: boolean;
+  pushNotifications: boolean;
+  weeklyReport: boolean;
+};
+
+/* =======================
+   Component
+   ======================= */
 const Settings = () => {
-  const { logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const navigate = useNavigate();
-  
-  const [name, setName] = useState(mockUser.name);
+
+  const [name, setName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  
-  const [notifications, setNotifications] = useState({
-    emailAlerts: true,
-    pushNotifications: false,
-    weeklyReport: true,
-  });
 
+  const [notifications, setNotifications] =
+    useState<NotificationSettings>({
+      emailAlerts: true,
+      pushNotifications: false,
+      weeklyReport: true,
+    });
+
+  /* Sync auth user → local state */
+  useEffect(() => {
+    if (user) {
+      setName(user.name);
+    }
+  }, [user]);
+
+  /* ✅ BACKEND-CONNECTED SAVE */
   const handleSave = async () => {
+    if (!user) return;
+
     setIsSaving(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+
+    try {
+      const res = await api.updateProfile(name);
+
+      // sync global auth state
+      updateUser(res.user);
+
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (error) {
+      console.error("Failed to update profile", error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
+
+  /* Prevent white screen */
+  if (!user) {
+    return (
+      <AppLayout>
+        <div className="flex h-[60vh] items-center justify-center text-muted-foreground">
+          Loading settings...
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -67,33 +110,28 @@ const Settings = () => {
           </Alert>
         )}
 
-        {/* Profile section */}
+        {/* Profile */}
         <div className="rounded-xl border bg-card p-6 shadow-card">
           <div className="flex items-center gap-2">
             <User className="h-5 w-5 text-muted-foreground" />
             <h2 className="font-semibold">Profile</h2>
           </div>
-          
+
           <div className="mt-6 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
               <Input
                 id="name"
                 value={name}
-                onChange={e => setName(e.target.value)}
+                onChange={(e) => setName(e.target.value)}
                 className="max-w-sm"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label>Email</Label>
               <div className="flex items-center gap-2">
-                <Input
-                  id="email"
-                  value={mockUser.email}
-                  disabled
-                  className="max-w-sm"
-                />
+                <Input value={user.email} disabled className="max-w-sm" />
                 <Mail className="h-4 w-4 text-muted-foreground" />
               </div>
               <p className="text-xs text-muted-foreground">
@@ -117,7 +155,7 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* Notifications section */}
+        {/* Notifications */}
         <div className="rounded-xl border bg-card p-6 shadow-card">
           <div className="flex items-center gap-2">
             <Bell className="h-5 w-5 text-muted-foreground" />
@@ -125,52 +163,30 @@ const Settings = () => {
           </div>
 
           <div className="mt-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Email Alerts</p>
-                <p className="text-sm text-muted-foreground">
-                  Receive alerts when air quality is unhealthy
-                </p>
+            {(
+              [
+                ["Email Alerts", "emailAlerts"],
+                ["Push Notifications", "pushNotifications"],
+                ["Weekly Report", "weeklyReport"],
+              ] as const
+            ).map(([label, key]) => (
+              <div key={key} className="flex items-center justify-between">
+                <p className="font-medium">{label}</p>
+                <Switch
+                  checked={notifications[key]}
+                  onCheckedChange={(value) =>
+                    setNotifications((prev) => ({
+                      ...prev,
+                      [key]: value,
+                    }))
+                  }
+                />
               </div>
-              <Switch
-                checked={notifications.emailAlerts}
-                onCheckedChange={v => setNotifications({ ...notifications, emailAlerts: v })}
-              />
-            </div>
-
-            <Separator />
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Push Notifications</p>
-                <p className="text-sm text-muted-foreground">
-                  Get real-time push notifications
-                </p>
-              </div>
-              <Switch
-                checked={notifications.pushNotifications}
-                onCheckedChange={v => setNotifications({ ...notifications, pushNotifications: v })}
-              />
-            </div>
-
-            <Separator />
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Weekly Report</p>
-                <p className="text-sm text-muted-foreground">
-                  Receive weekly air quality summary
-                </p>
-              </div>
-              <Switch
-                checked={notifications.weeklyReport}
-                onCheckedChange={v => setNotifications({ ...notifications, weeklyReport: v })}
-              />
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* Security section */}
+        {/* Security */}
         <div className="rounded-xl border bg-card p-6 shadow-card">
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-muted-foreground" />
@@ -179,18 +195,10 @@ const Settings = () => {
 
           <div className="mt-6 space-y-4">
             <Button variant="outline">Change Password</Button>
-            
-            <Separator />
-
-            <div>
-              <p className="text-sm text-muted-foreground">
-                Account created on {new Date(mockUser.createdAt).toLocaleDateString()}
-              </p>
-            </div>
           </div>
         </div>
 
-        {/* Logout section */}
+        {/* Logout */}
         <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6">
           <h2 className="font-semibold text-destructive">Danger Zone</h2>
           <p className="mt-2 text-sm text-muted-foreground">

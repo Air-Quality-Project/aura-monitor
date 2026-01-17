@@ -15,33 +15,40 @@ const loginSchema = z.object({
 });
 
 const Login = () => {
-  const { login } = useAuth();
+  const { login, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isSubmitting || authLoading) return;
+
     setError('');
 
-    // Validate input
     const result = loginSchema.safeParse({ email, password });
     if (!result.success) {
       setError(result.error.errors[0].message);
       return;
     }
 
-    setIsLoading(true);
+    setIsSubmitting(true);
 
     try {
       await login(email, password);
-      navigate('/');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
+      navigate('/', { replace: true });
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Login failed. Please try again.');
+      }
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -71,8 +78,9 @@ const Login = () => {
               placeholder="you@example.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              disabled={isLoading}
+              disabled={isSubmitting || authLoading}
               className="h-11"
+              autoComplete="email"
             />
           </div>
 
@@ -92,13 +100,18 @@ const Login = () => {
               placeholder="••••••••"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              disabled={isLoading}
+              disabled={isSubmitting || authLoading}
               className="h-11"
+              autoComplete="current-password"
             />
           </div>
 
-          <Button type="submit" className="h-11 w-full" disabled={isLoading}>
-            {isLoading ? (
+          <Button
+            type="submit"
+            className="h-11 w-full"
+            disabled={isSubmitting || authLoading}
+          >
+            {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Signing in...
@@ -108,26 +121,6 @@ const Login = () => {
             )}
           </Button>
         </form>
-
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">
-              Demo credentials
-            </span>
-          </div>
-        </div>
-
-        <div className="rounded-lg border bg-muted/30 p-3 text-center text-sm">
-          <p className="text-muted-foreground">
-            Email: <code className="text-foreground">demo@airpulse.io</code>
-          </p>
-          <p className="text-muted-foreground">
-            Password: <code className="text-foreground">demo123</code>
-          </p>
-        </div>
 
         <p className="text-center text-sm text-muted-foreground">
           Don't have an account?{' '}
