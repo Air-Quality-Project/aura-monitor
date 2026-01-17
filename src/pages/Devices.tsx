@@ -1,0 +1,272 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { AppLayout } from '@/components/layout';
+import { mockDevices, mockDevicesWithData } from '@/data/mockData';
+import { Device, getAQILevel, getAQILabel } from '@/types';
+import { cn } from '@/lib/utils';
+import {
+  Cpu,
+  Plus,
+  Search,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  ExternalLink,
+  Wifi,
+  WifiOff,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { formatDistanceToNow } from 'date-fns';
+
+const aqiColorClasses: Record<string, string> = {
+  'good': 'bg-aqi-good/10 text-aqi-good border-aqi-good/30',
+  'moderate': 'bg-aqi-moderate/10 text-aqi-moderate border-aqi-moderate/30',
+  'unhealthy-sensitive': 'bg-aqi-unhealthy-sensitive/10 text-aqi-unhealthy-sensitive border-aqi-unhealthy-sensitive/30',
+  'unhealthy': 'bg-aqi-unhealthy/10 text-aqi-unhealthy border-aqi-unhealthy/30',
+  'very-unhealthy': 'bg-aqi-very-unhealthy/10 text-aqi-very-unhealthy border-aqi-very-unhealthy/30',
+  'hazardous': 'bg-aqi-hazardous/10 text-aqi-hazardous border-aqi-hazardous/30',
+};
+
+const Devices = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | 'online' | 'offline'>('all');
+  const [renameDialog, setRenameDialog] = useState<{ open: boolean; device: Device | null }>({
+    open: false,
+    device: null,
+  });
+  const [newName, setNewName] = useState('');
+
+  const filteredDevices = mockDevicesWithData.filter(device => {
+    const matchesSearch = device.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      device.deviceId.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (filter === 'online') return matchesSearch && device.isOnline;
+    if (filter === 'offline') return matchesSearch && !device.isOnline;
+    return matchesSearch;
+  });
+
+  const handleRename = (device: Device) => {
+    setNewName(device.displayName);
+    setRenameDialog({ open: true, device });
+  };
+
+  const handleSaveRename = () => {
+    // In production, call API here
+    setRenameDialog({ open: false, device: null });
+  };
+
+  return (
+    <AppLayout>
+      <div className="space-y-6 animate-fade-in">
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Devices</h1>
+            <p className="text-muted-foreground">
+              Manage your ESP32 air quality monitors
+            </p>
+          </div>
+          <Button asChild>
+            <Link to="/devices/add">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Device
+            </Link>
+          </Button>
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="relative flex-1 sm:max-w-xs">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search devices..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <div className="flex gap-2">
+            {(['all', 'online', 'offline'] as const).map(f => (
+              <Button
+                key={f}
+                variant={filter === f ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setFilter(f)}
+                className="capitalize"
+              >
+                {f}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Device grid */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredDevices.map(device => {
+            const aqiLevel = device.latestReading ? getAQILevel(device.latestReading.aqi) : null;
+
+            return (
+              <div
+                key={device.id}
+                className="group relative overflow-hidden rounded-xl border bg-card p-5 shadow-card transition-all hover:shadow-card-hover"
+              >
+                {/* Status badge */}
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'absolute right-4 top-4',
+                    device.isOnline
+                      ? 'border-success/30 bg-success/10 text-success'
+                      : 'border-muted bg-muted text-muted-foreground'
+                  )}
+                >
+                  {device.isOnline ? (
+                    <>
+                      <Wifi className="mr-1 h-3 w-3" />
+                      Online
+                    </>
+                  ) : (
+                    <>
+                      <WifiOff className="mr-1 h-3 w-3" />
+                      Offline
+                    </>
+                  )}
+                </Badge>
+
+                {/* Device icon */}
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                  <Cpu className="h-6 w-6 text-primary" />
+                </div>
+
+                {/* Device info */}
+                <div className="mt-4 space-y-1">
+                  <h3 className="font-semibold">{device.displayName}</h3>
+                  <p className="text-xs text-muted-foreground">{device.deviceId}</p>
+                </div>
+
+                {/* Metrics */}
+                <div className="mt-4 flex items-center gap-4">
+                  {device.latestReading && aqiLevel && (
+                    <div
+                      className={cn(
+                        'rounded-md border px-2 py-1 text-sm font-medium',
+                        aqiColorClasses[aqiLevel]
+                      )}
+                    >
+                      AQI {device.latestReading.aqi}
+                    </div>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    v{device.firmware}
+                  </span>
+                </div>
+
+                {/* Last seen */}
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Last seen {formatDistanceToNow(new Date(device.lastSeen), { addSuffix: true })}
+                </p>
+
+                {/* Actions */}
+                <div className="mt-4 flex items-center gap-2">
+                  <Button asChild variant="outline" size="sm" className="flex-1">
+                    <Link to={`/devices/${device.id}`}>
+                      View Details
+                      <ExternalLink className="ml-2 h-3 w-3" />
+                    </Link>
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleRename(device)}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Rename
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-destructive">
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Remove
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {filteredDevices.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <Cpu className="h-12 w-12 text-muted-foreground/50" />
+            <h3 className="mt-4 text-lg font-medium">No devices found</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {searchQuery
+                ? 'Try adjusting your search query'
+                : 'Add your first device to get started'}
+            </p>
+            {!searchQuery && (
+              <Button asChild className="mt-4">
+                <Link to="/devices/add">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Device
+                </Link>
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Rename Dialog */}
+      <Dialog open={renameDialog.open} onOpenChange={open => setRenameDialog({ open, device: renameDialog.device })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Device</DialogTitle>
+            <DialogDescription>
+              Give your device a memorable name
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Display Name</Label>
+              <Input
+                id="name"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                placeholder="Living Room Monitor"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameDialog({ open: false, device: null })}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveRename}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </AppLayout>
+  );
+};
+
+export default Devices;
